@@ -1,0 +1,9 @@
+python generate_spectrogram.py --input output/chirp_240.bin --fs 24e6 --segment-seconds 1 --num-segments 1 --output-template "spec_{index:03d}.png" --dtype float32
+
+
+python generate_interference.py --input raw/gnss_rx_24.bin --output output/chirp_24 --fs 24e6 --dtype float32 --segment-seconds 1 --jammer chirp --chirp-duration 1 --chirp-bw 5e6
+
+
+python generate_spectrogram.py --input raw/gnss_rx_24.bin --fs 24e6 --segment-seconds 1 --num-segments 1 --output-template "spec_{index:03d}.png" --dtype float32 --median-filter 15 --median-freq 3 --n-fft 16384
+
+python Data/full_generate.py --input Data/raw/gnss_rx_24.bin --fs 24e6 --segment-seconds 0.25 --n-fft 8192 --num-segments 2 --output-dir "Data/test_output_new"  --jsr-lb -5 --jsr-ub 35

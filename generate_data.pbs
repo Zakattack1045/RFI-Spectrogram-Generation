@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -N data_generation
+#PBS -l select=1:ngpus=1:ncpus=36:mem=250gb
+#PBS -l walltime=24:00:00
+#PBS -j oe
+#PBS -o gen.log
+
+# Change to working directory
+cd $PBS_O_WORKDIR
+
+module load matplotlib/3.7.0-foss-2022a
+
+# Run generation
+python full_generate.py --input raw/gnss_rx_24.bin --fs 24e6 --segment-seconds 0.25 --num-segments 1200 --n-fft 8192 --output-dir "Output"  --jnr-lb -5 --jnr-ub 40

@@ -269,17 +269,43 @@ def generate_spectrogram(
         print(f"[warn] No frames for segment. Skipping.")
         return
 
-    # Power dB
-    J_db = power_db(J)
-    S_db = power_db(S)
+    # Option 1: Correct power addition in linear scale
+    # Step 1: Compute power in LINEAR scale
+    S_power = (S.real ** 2 + S.imag ** 2).astype(np.float32)
+    J_power = (J.real ** 2 + J.imag ** 2).astype(np.float32)
 
-    S_db = median_filter(S_db, size=(filter[0], filter[1] ))
-        
+    # Step 2: Convert clean signal to dB for filtering
+    with np.errstate(divide='ignore'):
+        S_db = 10.0 * np.log10(np.maximum(S_power, 1e-30))
+    S_db = np.maximum(S_db, -160.0)  # Floor to avoid -inf
+
+    # Step 3: Apply median filter to clean signal in dB space (reduces noise)
+    S_db_filtered = median_filter(S_db, size=(filter[0], filter[1]))
+
+    # Step 4: Convert filtered clean signal back to LINEAR power
+    S_power_filtered = 10 ** (S_db_filtered / 10.0)
+
+    # Step 5: Add LINEAR powers (this is the CORRECT way to combine signals!)
+    Total_power = S_power_filtered + J_power
+
+    # Step 6: Convert combined power to dB
+    with np.errstate(divide='ignore'):
+        Out_db = 10.0 * np.log10(np.maximum(Total_power, 1e-30))
+    Out_db = np.maximum(Out_db, -160.0)
+
+    # Step 7: Optional light smoothing on combined spectrogram
+    Out_db = median_filter(Out_db, size=(3, 3))
+
+    # Save jammer ground truth (convert jammer power to dB)
+    with np.errstate(divide='ignore'):
+        J_db = 10.0 * np.log10(np.maximum(J_power, 1e-30))
+    J_db = np.maximum(J_db, -160.0)
+
     save_binary_mask(J_db, jammer_out_path)
-    save_spectrogram( (S_db + J_db), out_path, vmin=vmin, vmax=vmax)
+    save_spectrogram(Out_db, out_path, vmin=vmin, vmax=vmax)
 
     png_size = Path(out_path).stat().st_size / (1024 * 1024)
-    print(f"[ok] {out_path}  ({png_size:.2f} MB, dB: {S_db.min():.1f} to {S_db.max():.1f})")
+    print(f"[ok] {out_path}  ({png_size:.2f} MB, dB: {Out_db.min():.1f} to {Out_db.max():.1f})")
 
 
 

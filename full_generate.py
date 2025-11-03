@@ -177,11 +177,14 @@ def save_spectrogram(
     out_path: str,
     vmin: float = None,
     vmax: float = None,
-    cmap: str = "jet"
+    cmap: str = "jet",
+    gamma: float = 1.0
 ):
     """
     Save spectrogram image (PNG) with axes in seconds and MHz.
     S_db shape: [frames, n_fft] in dB
+    gamma: Gamma correction factor. Values < 1.0 boost mid-range values (increases contrast).
+           Default 1.0 (no correction). Try 0.5-0.7 to make jammers more visible.
     """
 
     # Auto-detect reasonable dB range if not specified
@@ -196,6 +199,10 @@ def save_spectrogram(
         print(f"[info] Auto dB range: {vmin:.1f} to {vmax:.1f} dB")
 
     S_norm = np.clip((S_db - vmin) / (vmax - vmin), 0, 1)
+
+    # Apply gamma correction to boost contrast (helps make jammers more visible)
+    if gamma != 1.0:
+        S_norm = np.power(S_norm, gamma)
 
     fig = plt.figure(frameon=False)
     fig.set_size_inches(S_norm.shape[1]/100, S_norm.shape[0]/100)
@@ -261,7 +268,8 @@ def generate_spectrogram(
         hop: int, window: np.ndarray,
         out_path: str, jammer_out_path: str,
         filter: tuple,
-        vmin: float = None, vmax: float = None,):
+        vmin: float = None, vmax: float = None,
+        gamma: float = 1.0):
     # STFT
     J, freqs, times = stft_complex_iq(jammer, fs, n_fft, hop, window)
     S, freqs, times = stft_complex_iq(x, fs, n_fft, hop, window)
@@ -294,7 +302,7 @@ def generate_spectrogram(
     Out_db = np.maximum(Out_db, -160.0)
 
     # Step 7: Optional light smoothing on combined spectrogram
-    Out_db = median_filter(Out_db, size=(3, 3))
+    # Out_db = median_filter(Out_db, size=(3, 3))
 
     # Save jammer ground truth (convert jammer power to dB)
     with np.errstate(divide='ignore'):
@@ -302,7 +310,7 @@ def generate_spectrogram(
     J_db = np.maximum(J_db, -160.0)
 
     save_binary_mask(J_db, jammer_out_path)
-    save_spectrogram(Out_db, out_path, vmin=vmin, vmax=vmax)
+    save_spectrogram(Out_db, out_path, vmin=vmin, vmax=vmax, gamma=gamma)
 
     png_size = Path(out_path).stat().st_size / (1024 * 1024)
     print(f"[ok] {out_path}  ({png_size:.2f} MB, dB: {Out_db.min():.1f} to {Out_db.max():.1f})")
@@ -361,7 +369,9 @@ def main():
                     help="Min dB for colorbar (default: auto)")
     ap.add_argument("--vmax", type=float, default=None,
                     help="Max dB for colorbar (default: auto)")
-    
+    ap.add_argument("--gamma", type=float, default=1.0,
+                    help="Gamma correction factor for visibility (default: 1.0, try 0.5-0.7 to boost jammer contrast)")
+
     # Jammer Control
     ap.add_argument("--jsr-lb", type=float, default=0.0, help="Jammer-to-noise ratio lower bound in dB")
     ap.add_argument("--jsr-ub", type=float, default=0.0, help="Jammer-to-noise ratio upper bound in dB")
@@ -485,7 +495,7 @@ def main():
                 jammer = generate_pulsed_jammer(
                     n_samples=need,
                     fs=args.fs,
-                    pulse_width=0.01,
+                    pulse_width=args.segment_seconds / 10,
                     pulse_period=args.segment_seconds / 4,
                     freq_offset=freq_offset,
                     phase=0.0
@@ -522,7 +532,7 @@ def main():
         generate_spectrogram(
             x, jammer, eff_fs, n_fft, hop, win,
             spec_png_path, mask_png_path, filter=(args.median_filter, args.median_freq),
-            vmin=args.vmin, vmax=args.vmax
+            vmin=args.vmin, vmax=args.vmax, gamma=args.gamma
         )
         
         

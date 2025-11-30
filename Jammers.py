@@ -1,6 +1,6 @@
 import numpy as np
 
-def generate_cw_tone(n_samples: int, fs: float, freq_offset: float, phase: float = 0.0) -> np.ndarray:
+def generate_cw_tone(n_samples: int, fs: float, freq_offset: float, phase: float = 0.0, bandwidth: float = 0.0) -> np.ndarray:
     """
     Continuous Wave (CW) tone jammer.
 
@@ -14,15 +14,31 @@ def generate_cw_tone(n_samples: int, fs: float, freq_offset: float, phase: float
         Frequency offset from baseband (Hz)
     phase : float
         Initial phase (radians)
+    bandwidth : float
+        Optional bandwidth (Hz) to add via phase noise. Makes the tone thicker in spectrograms.
+        If 0, generates a pure tone. Typical values: 100-1000 Hz for visible thickness.
 
     Returns
     -------
     np.ndarray
         Complex jammer signal
     """
+    freq_offset = (freq_offset + fs/8) if freq_offset > 0  else (freq_offset - fs/8)
     # Use float64 for time array to avoid precision loss with large n_samples
     t = np.arange(n_samples, dtype=np.float64) / fs
-    return np.exp(1j * (2 * np.pi * freq_offset * t + phase)).astype(np.complex64)
+
+    # Base carrier
+    signal_phase = 2 * np.pi * freq_offset * t + phase
+
+    # Add bandwidth via phase noise (random walk in phase)
+    if bandwidth > 0:
+        # Phase noise with specified bandwidth
+        # Standard deviation of phase increment per sample
+        phase_noise_std = 2 * np.pi * bandwidth / fs
+        phase_noise = np.cumsum(np.random.randn(n_samples) * phase_noise_std)
+        signal_phase += phase_noise
+
+    return np.exp(1j * signal_phase).astype(np.complex64)
 
 def generate_pulsed_jammer(
     n_samples: int,
@@ -30,7 +46,8 @@ def generate_pulsed_jammer(
     freq_offset: float,
     pulse_width: float,
     pulse_period: float,
-    phase: float = 0.0
+    phase: float = 0.0,
+    bandwidth: float = 0.0
 ) -> np.ndarray:
     """
     Pulsed jammer - periodic on/off keyed interference.
@@ -41,9 +58,11 @@ def generate_pulsed_jammer(
         Pulse duration (seconds)
     pulse_period : float
         Time between pulse starts (seconds)
+    bandwidth : float
+        Optional bandwidth (Hz) to add via phase noise. Makes the tone thicker in spectrograms.
     """
-    # Generate carrier
-    carrier = generate_cw_tone(n_samples, fs, freq_offset, phase)
+    # Generate carrier with optional bandwidth
+    carrier = generate_cw_tone(n_samples, fs, freq_offset, phase, bandwidth)
 
     # Generate pulse train - use float64 for precision
     t = np.arange(n_samples, dtype=np.float64) / fs
@@ -59,7 +78,8 @@ def generate_chirp_jammer(
     chirp_bw: float,
     chirp_duration: float,
     center_freq: float = 0.0,
-    amplitude: float = 1.0
+    amplitude: float = 1.0,
+    bandwidth: float = 0.0
 ) -> np.ndarray:
     """
     Linear chirp (frequency sweep) jammer.
@@ -67,12 +87,17 @@ def generate_chirp_jammer(
     Parameters
     ----------
     chirp_bw : float
-        Chirp bandwidth (Hz) - sweeps from -bw/2 to +bw/2
+        Chirp bandwidth (Hz) - sweeps from -bw/2 to +bw/2 over the chirp duration
     chirp_duration : float
         Duration of one chirp (seconds), then repeats
     center_freq : float
         Center frequency offset (Hz)
+    bandwidth : float
+        Optional instantaneous bandwidth (Hz) to add via phase noise.
+        Makes the chirp line thicker in spectrograms. This is different from chirp_bw
+        which controls the frequency range swept.
     """
+    center_freq = (center_freq + fs/8) if center_freq > 0  else (center_freq - fs/8)
     # Use float64 for time array to avoid precision loss with large n_samples
     t = np.arange(n_samples, dtype=np.float64) / fs
     T = chirp_duration / 2
@@ -96,8 +121,14 @@ def generate_chirp_jammer(
     # Phase at end of one chirp period
     phase_per_chirp = 2 * np.pi * (f_start * chirp_duration + 0.5 * chirp_rate * chirp_duration**2)
     phase = phase_in_chirp + n_chirps * phase_per_chirp
-    # No need for phase modulo - exp() handles any phase value
 
+    # Add bandwidth via phase noise (same approach as CW tone)
+    if bandwidth > 0:
+        phase_noise_std = 2 * np.pi * bandwidth / fs
+        phase_noise = np.cumsum(np.random.randn(n_samples) * phase_noise_std)
+        phase += phase_noise
+
+    # No need for phase modulo - exp() handles any phase value
     return np.exp(1j * phase).astype(np.complex64)
 
 def generate_barrage_jammer(n_samples: int, fs: float, seed: int = None) -> np.ndarray:

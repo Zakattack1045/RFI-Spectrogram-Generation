@@ -44,6 +44,7 @@ import matplotlib.pyplot as plt
 from numpy.lib.stride_tricks import sliding_window_view
 from scipy.ndimage import uniform_filter, median_filter
 from Jammers import generate_cw_tone, generate_chirp_jammer, generate_barrage_jammer, generate_pulsed_jammer
+# from utils import SpectrogramDataset
 
 
 # ---------------------------
@@ -489,7 +490,8 @@ def main():
                     n_samples=need,
                     fs=args.fs,
                     freq_offset=freq_offset,
-                    phase=0.0
+                    phase=0.0,
+                    bandwidth=jammer_BW/8
                 )
             case 'pulse':
                 jammer = generate_pulsed_jammer(
@@ -498,7 +500,8 @@ def main():
                     pulse_width=args.segment_seconds / 10,
                     pulse_period=args.segment_seconds / 4,
                     freq_offset=freq_offset,
-                    phase=0.0
+                    phase=0.0,
+                    bandwidth=jammer_BW/8
                 )
             case 'chirp':
                 jammer = generate_chirp_jammer(
@@ -506,7 +509,8 @@ def main():
                     fs=args.fs,
                     chirp_bw=jammer_BW,
                     chirp_duration=args.segment_seconds,
-                    center_freq= 0.0
+                    center_freq= random.randint(-int(args.fs/6), int(args.fs/6)),
+                    bandwidth=jammer_BW/8
                 )
             case "barrage":
                 jammer = generate_barrage_jammer(
@@ -561,6 +565,33 @@ def main():
         with open(args.output_dir + "/metadata.json", 'w') as f:
             json.dump(metadata, f, indent=2)
         print(f"\n[done] Generated {made} spectrogram(s).")
+
+    # dataset = SpectrogramDataset(args.output_dir,height=64, width=64)
+    # for i in range(len(dataset)):
+    #     # Load spectrogram
+    #     spectrogram, true_mask_2d = dataset[i]
+    #     spectrogram = spectrogram.squeeze().numpy()  # (H, W)
+    #     true_mask_2d = true_mask_2d.squeeze().numpy()  # (H, W)
+
+    #     # Create comparison figure
+    #     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+
+    #     # Original spectrogram
+    #     axes[0].imshow(spectrogram, cmap='viridis')
+    #     axes[0].set_title('Input Spectrogram')
+    #     axes[0].axis('off')
+
+    #     # Ground truth mask
+    #     axes[1].imshow(true_mask_2d, cmap='gray', vmin=0, vmax=1)
+    #     axes[1].set_title('Ground Truth Mask')
+    #     axes[1].axis('off')
+
+    #     plt.tight_layout()
+    #     plt.savefig(args.output_dir +f'/sample_{i:03d}.png', dpi=150)
+    #     plt.close()
+
+
+    
 
 
 if __name__ == "__main__":

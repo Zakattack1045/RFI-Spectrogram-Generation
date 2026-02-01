@@ -14,3 +14,5 @@ python Data/full_generate.py --input Data/raw/gnss_rx_24.bin --fs 24e6 --segment
 
 
 python Data/generate_spectrogram.py --input Data/raw/GNU_Data_out --fs 32000 --segment-seconds 0.25 --num-segments 4 --n-fft 256 --output-dir "Data/OUTPUTS/GNU_Specs_Out" --gamma 0.7
+
+python Data/generate_spectrogram.py --input Data/raw/Clean_Data_out --fs 2500000 --segment-seconds 0.25 --num-segments 4 --n-fft 512 --output-dir "Data/OUTPUTS/Clean_Specs_Out" --gamma 0.7

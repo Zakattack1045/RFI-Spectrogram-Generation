@@ -58,6 +58,7 @@ def main():
     ap.add_argument("--gamma", type=float, default=1.0,
                     help="Gamma correction factor for visibility (default: 1.0, try 0.5-0.7 to boost jammer contrast)")
     # Output
+    ap.add_argument("--mask" , default=False, help="Toggle for binary mask output")
     ap.add_argument("--output-dir", default="output_spectrograms",
                     help="Directory to save spectrogram images and metadata")
     ap.add_argument("--title", default="Spectrogram", help="Title prefix for plots")
@@ -178,7 +179,10 @@ def main():
             Out_db = 10.0 * np.log10(np.maximum(S_power_filtered, 1e-30))
         Out_db = np.maximum(Out_db, -160.0)
 
-        utils.save_spectrogram(Out_db, spec_png_path, vmin=args.vmin, vmax=args.vmax, gamma=args.gamma)
+        if args.mask:
+            utils.save_binary_mask(Out_db, spec_png_path)
+        else:
+            utils.save_spectrogram(Out_db, spec_png_path, vmin=args.vmin, vmax=args.vmax, gamma=args.gamma)
         
         
         # Add each sample
